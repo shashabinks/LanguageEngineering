@@ -27,3 +27,7 @@ data IntTree = Br Int IntTree IntTree | Lf
 count :: IntTree -> Int
 count Lf = 0
 count (Br n ls rs) = 1 + (count ls) + (count rs)
+
+depth :: IntTree -> Int 
+depth Lf = 0
+depth (Br n ls rs) = 1 + max(depth ls) (depth rs)
