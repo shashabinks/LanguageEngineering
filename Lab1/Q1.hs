@@ -20,3 +20,10 @@ isSorted::[Int]->Bool
 isSorted [] = True
 isSorted [x] = True
 isSorted (x:y:xs) = x < y && isSorted(y:xs)
+
+
+data IntTree = Br Int IntTree IntTree | Lf
+
+count :: IntTree -> Int
+count Lf = 0
+count (Br n ls rs) = 1 + (count ls) + (count rs)
