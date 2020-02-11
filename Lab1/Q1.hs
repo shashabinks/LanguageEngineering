@@ -9,3 +9,9 @@ max3 x y z
     | x > max y z = x
     | y > max x z = y
     | otherwise = z
+
+isPositive::[Int]->Bool
+isPositive [] = True
+isPositive (x:xs)
+        | x > 0 = isPositive xs
+        | otherwise = False
