@@ -15,3 +15,8 @@ isPositive [] = True
 isPositive (x:xs)
         | x > 0 = isPositive xs
         | otherwise = False
+    
+isSorted::[Int]->Bool
+isSorted [] = True
+isSorted [x] = True
+isSorted (x:y:xs) = x < y && isSorted(y:xs)
