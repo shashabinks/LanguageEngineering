@@ -21,6 +21,7 @@ cvalue = lookup env "c"
 {- Object language expressions with variables -}
 
 data Expr = CstI Int 
+          | If Expr Expr Expr
           | Var String
           | Prim String Expr Expr  
           deriving Show
