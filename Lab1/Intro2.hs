@@ -40,13 +40,16 @@ eval :: Expr -> [(String, Int)] -> Int
 eval (CstI i) env   = i
 eval (Var x)  env   = lookup env x
 eval (Prim op e1 e2) env 
-    | op == "+" = eval e1 env + eval e2 env 
-    | op == "*" = eval e1 env * eval e2 env
-    | op == "-" = eval e1 env - eval e2 env
-    |op == "min" = min(eval e1 env) (eval e2 env)
-    |op == "max" = max(eval e1 env) (eval e2 env)
-    |op =="==" = if eval e1 env == eval e2 env then 1 else 0
-    | otherwise = error "unknown primitive"
+    = let i1 = eval e1 env
+          i2 = eval e2 env
+      in case op of
+              "+" -> i1 + i2
+              "*" -> i1 * i2
+              "-" -> i1 - i2
+              "min" -> min(eval e1 env) (eval e2 env)
+              "max" -> max(eval e1 env) (eval e2 env)
+              "==" -> if eval e1 env == eval e2 env then 1 else 0
+               
 
 e1v  = eval e1 env
 e2v1 = eval e2 env
