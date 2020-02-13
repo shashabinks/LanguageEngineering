@@ -33,6 +33,7 @@ e3 = Prim "+" (Prim "*" (Var "b") (CstI 9)) (Var "a")
 e4 = Prim "==" (CstI 1)(CstI 2)
 e5 = Prim "max" (CstI 5)(CstI 2)
 e6 = Prim "min" (CstI 12)(CstI 4)
+e7 = If (Var "a") (CstI 11) (CstI 22)
 
 
 {- Evaluation within an environment -}
@@ -40,17 +41,19 @@ e6 = Prim "min" (CstI 12)(CstI 4)
 eval :: Expr -> [(String, Int)] -> Int 
 eval (CstI i) env   = i
 eval (Var x)  env   = lookup env x
+eval (If e1 e2 e3) env = if (eval e1 env) /= 0 then eval e2 env else eval e3 env 
 eval (Prim op e1 e2) env 
-    = let i1 = eval e1 env
-          i2 = eval e2 env
-      in case op of
+     = let i1 = eval e1 env
+           i2 = eval e2 env
+       in case op of
               "+" -> i1 + i2
               "*" -> i1 * i2
               "-" -> i1 - i2
               "min" -> min(eval e1 env) (eval e2 env)
               "max" -> max(eval e1 env) (eval e2 env)
               "==" -> if eval e1 env == eval e2 env then 1 else 0
-               
+              otherwise -> error "unknown"
+   
 
 e1v  = eval e1 env
 e2v1 = eval e2 env
@@ -59,6 +62,7 @@ e3v  = eval e3 env
 e4v  = eval e4 env
 e5v  = eval e5 env
 e6v  = eval e6 env
+e7v  = eval e7 env
 
 
 
