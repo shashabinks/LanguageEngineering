@@ -11,6 +11,18 @@ inorder :: Tree a -> [a]
 inorder Lf = []
 inorder (Br n ls rs) = inorder ls ++ [n] ++ inorder rs 
 
-preorder :: Tree a -> [a]
-preorder Lf = []
-preorder (Br n ls rs) = preorder ls ++ preorder rs ++ [n]
+postorder :: Tree a -> [a]
+postorder Lf = []
+postorder (Br n ls rs) = postorder ls ++ postorder rs ++ [n]
+
+ino :: Tree a -> [a] -> [a]
+ino Lf acc = acc
+ino (Br n t1 t2) acc = ino t1 (n:(ino t2 acc)) 
+
+inorderAcc  t = ino t []
+
+posto :: Tree a -> [a] -> [a]
+posto Lf acc = acc
+posto (Br n t1 t2) acc = (posto t1(posto t2 (v:acc))) 
+
+postorderAcc  t = posto t []
