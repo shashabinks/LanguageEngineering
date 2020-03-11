@@ -1,40 +1,68 @@
+module Expr where
 
-{- Evaluation, checking, and compilation of object language expressions -}
-{- Stack machines for expression evaluation                             -} 
+import Absyn
 
-{- Object language expressions with variable bindings and nested scope  -}
+{- # Simple expression language with various evaluators and compilers # -}
 
-{-# LANGUAGE
-     DeriveFunctor #-}
 
-module Intcomp1 where
+-- > ghci Expr.hs Absyn.hs ExprLex.hs ExprPar.hs
 
-import Prelude hiding (lookup)
-import Control.Applicative 
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.State
-import Data.List (intercalate)
+{-*----------------------------------------------------------------------*-}
+
+{- # Formatting Expressions # -}
+
+e1 = Let "z" (CstI 17) (Prim "+" (Var "z") (Var "z"))
+e2 = Let "z" (CstI 17) (Prim "+" (Let "z" (CstI 22) (Prim "*" (CstI 100) (Var "z"))) (Var "z"))
+e3 = Let "z" (Prim "-" (CstI 5) (CstI 4)) (Prim "*" (CstI 100) (Var "z"));
+e4 = Prim "-" (Prim "-" (Var "a") (Var "b")) (Var "c")
+e5 = Prim "-" (Var "a") (Prim "-" (Var "b") (Var "c"))
+e6 = Prim "*" (Prim "-" (Var "a") (Var "b")) (Var "c")
+e7 = Prim "-" (Prim "*" (Var "a") (Var "b")) (Var "c")
+e8 = Prim "*" (Var "a") (Prim "-" (Var "b") (Var "c"))
+e9 = Prim "-" (Var "a") (Prim "*" (Var "b") (Var "c"))
+
+es = [e1, e2, e3, e4, e5, e6, e7, e8, e9]
+
+-- | Formatting expressions as strings
+
+fmt1 :: Expr -> String 
+fmt1 e = 
+    case e of
+      CstI i           -> show i
+      Var x            -> x 
+      Let x erhs ebody -> "let " ++ x ++ " = " ++ fmt1 erhs ++ " in " ++ fmt1 ebody 
+      Prim op e1 e2    -> "(" ++ fmt1 e1 ++ " " ++ op ++ " " ++ fmt1 e2 ++ ")"
+
+
+-- | Formatting expressions as strings, avoiding excess parentheses 
+
+fmt2 :: Int -> Expr -> String
+fmt2 ctxpre e = 
+    case e of 
+      CstI i           -> show i
+      Var x            -> x 
+      Let x erhs ebody -> "let " ++ x ++ " = " ++ fmt2 (-1) erhs ++ " in " ++ fmt2 (-1) ebody 
+      Prim op e1 e2    -> case op of 
+                            "+" -> wrappar ctxpre 6 [fmt2 5 e1, op, fmt2 6 e2]
+                            "-" -> wrappar ctxpre 6 [fmt2 5 e1, op, fmt2 6 e2]
+                            "*" -> wrappar ctxpre 7 [fmt2 6 e1, op, fmt2 7 e2]
+                            _   -> error "unknown primitive"
+
+    where wrappar :: Int -> Int -> [String] -> String
+          wrappar ctxpre pre ss = if pre <= ctxpre then concat (["("] ++ ss ++ [")"])
+                                  else concat ss
+
+fmt :: Expr -> String
+fmt e = fmt2 (-1) e
 
 
 {-*----------------------------------------------------------------------*-}
 
 {- # Expressions with Let-Bindings and Static Scope # -}
 
-data Expr = CstI Int
-          | Var  String
-          | LetM [(String,Expr)] Expr
-          | Let  String Expr Expr
-          | Prim String Expr Expr
-          deriving Show
-
 eval :: Expr -> [(String, Int)] -> Int 
 eval (CstI i) env   = i
 eval (Var x)  env   = lookup env x
-eval (LetM n erhs ebody) env
-    = let xval = eval erhs env 
-          env1 = ((x, xval):env)
-      in  eval ebody env1
-
 eval (Let x erhs ebody) env
     = let xval = eval erhs env 
           env1 = ((x, xval):env)
@@ -273,19 +301,23 @@ runFresh (Fresh f) = f 0
 --                     in  expr'
 
 subst :: Expr -> [(String, Expr)] -> Fresh Int Expr
-subst (CstI i) env = return (CstI i)
-subst (Var x) env  = return (lookOrSelf env x)
+subst (CstI i) env 
+    = return (CstI i)
+subst (Var x) env
+    = return (lookOrSelf env x)
 subst (Let x erhs ebody) env 
-    = do erhs1   <- subst erhs env  
-         counter <- fresh
-         let newx   = x ++ show counter 
-             newenv = ((x, Var newx):(remove env x))
-         ebody1  <- subst ebody newenv 
-         return (Let newx erhs1 ebody1)
+    = do 
+        erhs1   <- subst erhs env  
+        counter <- fresh
+        let newx   = x ++ show counter 
+            newenv = ((x, Var newx):(remove env x))
+        ebody1  <- subst ebody newenv 
+        return (Let newx erhs1 ebody1)
 subst (Prim op e1 e2) env
-    = do e1' <- subst e1 env
-         e2' <- subst e2 env 
-         return (Prim op e1' e2')
+    = do 
+        e1' <- subst e1 env
+        e2' <- subst e2 env 
+        return (Prim op e1' e2')
 
 runSubst :: Expr -> [(String, Expr)] -> Expr
 runSubst expr env = let (expr', counter) = runFresh (subst expr env) 
@@ -314,8 +346,9 @@ data TExpr = TCstI Int
 -- | Map variable name to variable index at compile-time
 
 getindex :: Eq a => [a] -> a -> Int
-getindex [] x     = error "Variable not found"
-getindex (y:yr) x = if x == y then 0 else 1 + getindex yr x
+getindex vs x 
+    = case vs of []     -> error "Variable not found"
+                 (y:yr) -> if x == y then 0 else 1 + getindex yr x
 
 -- | Compiling from Expr to TExpr
 
@@ -366,15 +399,17 @@ data RInstr = RCstI Int
 --   in postfix form
 
 reval :: [RInstr] -> [Int] -> Int 
-reval [] (v:vs)                 = v 
-reval [] []                     = error "reval: no result on stack!"
-reval ((RCstI i):insr) stk      = reval insr (i:stk)
-reval (RAdd:insr) (i2:i1:stkr)  = reval insr ((i1+i2):stkr)
-reval (RSub:insr) (i2:i1:stkr)  = reval insr ((i1-i2):stkr)
-reval (RMul:insr) (i2:i1:stkr)  = reval insr ((i1*i2):stkr)
-reval (RDup:insr) (i1:stkr)     = reval insr (i1:i1:stkr)
-reval (RSwap:insr) (i2:i1:stkr) = reval insr (i1:i2:stkr)
-reval _ _                       = error "reval: too few operands on stack"
+reval inss stack =
+    case (inss, stack) of 
+        ([], (v:vs))                      -> v 
+        ([], [])                          -> error "reval: no result on stack!"
+        (((RCstI i):insr),  stk)          -> reval insr (i:stk)
+        ((RAdd:insr),       (i2:i1:stkr)) -> reval insr ((i1+i2):stkr)
+        ((RSub:insr),       (i2:i1:stkr)) -> reval insr ((i1-i2):stkr)
+        ((RMul:insr),       (i2:i1:stkr)) -> reval insr ((i1*i2):stkr)
+        ((RDup:insr),       (i1:stkr))    -> reval insr (i1:i1:stkr)
+        ((RSwap:insr),      (i2:i1:stkr)) -> reval insr (i1:i2:stkr)
+        _                                 -> error "reval: too few operands on stack"
         
 -- | Compilation of a variable-free expression to a RInstr list
 
@@ -404,16 +439,18 @@ data SInstr = SCstI Int     -- push integer
 
 
 seval :: [SInstr] -> [Int] -> Int 
-seval [] (v:vs)                 = v 
-seval [] []                     = error "seval: no result on stack!"
-seval ((SCstI i):insr) stk      = seval insr (i:stk)
-seval ((SVar i):insr)  stk      = seval insr ((stk !! i):stk)
-seval (SAdd:insr)  (i2:i1:stkr) = seval insr ((i1+i2):stkr)
-seval (SSub:insr)  (i2:i1:stkr) = seval insr ((i1-i2):stkr)
-seval (SMul:insr)  (i2:i1:stkr) = seval insr ((i1*i2):stkr)
-seval (SPop:insr)  (_:stkr)     = seval insr stkr
-seval (SSwap:insr) (i2:i1:stkr) = seval insr (i1:i2:stkr)
-seval _ _                       = error "seval: too few operands on stack"
+seval inss stack =
+    case (inss, stack) of 
+        ([], (v:vs))                      -> v 
+        ([], [])                          -> error "seval: no result on stack!"
+        (((SCstI i):insr),  stk)          -> seval insr (i:stk)
+        (((SVar i):insr),   stk)          -> seval insr ((stk !! i):stk)
+        ((SAdd:insr),       (i2:i1:stkr)) -> seval insr ((i1+i2):stkr)
+        ((SSub:insr),       (i2:i1:stkr)) -> seval insr ((i1-i2):stkr)
+        ((SMul:insr),       (i2:i1:stkr)) -> seval insr ((i1*i2):stkr)
+        ((SPop:insr),       (_:stkr))     -> seval insr stkr
+        ((SSwap:insr),      (i2:i1:stkr)) -> seval insr (i1:i2:stkr)
+        _                                 -> error "seval: too few operands on stack"
         
 
 -- | A compile-time variable environment representing the state of
@@ -450,17 +487,3 @@ intsToFile inss fname = do
                 let text = intercalate " " (map show inss)
                 writeFile fname text
 
-assemble :: [SInstr] -> [Int]
-assemble [] = []
-assemble (x:xs) 
- = let xs' = assemble xs 
-    in case x of SCstI i -> (0:i:xs')
-                 SVar  i -> (1:i:xs')
-                 SAdd    -> (2:xs')
-                 SSub    -> (3:xs')
-                 SMul    -> (4:xs')
-                 SPop    -> (5:xs')
-                 SSwap   -> (6:xs')
-
-scompeval :: Expr -> [StackValue] -> IO ()
-scompeval x = flip intsToFile "fname" . assemble . scomp x
