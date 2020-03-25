@@ -35,8 +35,5 @@ scomp (Prim op e1 e2) cenv
         _   -> error "scomp: unknown operator"
 
 
-
-
-
 compString :: String -> [SInstr]
-compString s = compString (parseFromString s) []
+compString s = scomp (parseFromString s) []
