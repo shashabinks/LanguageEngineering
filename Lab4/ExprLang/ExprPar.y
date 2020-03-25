@@ -15,6 +15,9 @@ import ExprLex
         let     { TokenLet  }
         in      { TokenIn   }
         end     { TokenEnd  }
+        if      { TokenIf   }
+        then    { TokenThen }
+        else    { TokenElse }
         num     { TokenNum $$ }
         var     { TokenVar $$ }
         '='     { TokenEq   }
@@ -31,6 +34,7 @@ Expr    : var                          { Var  $1           }
         | '-' num                      { CstI (- $2)       }
         | '(' Expr ')'                 { $2                }
         | let var '=' Expr in Expr end { Let $2 $4 $6      }
+        | if Expr then Expr else Expr  { If $2 $4 $6       }
         | Expr '*' Expr                { Prim "*" $1 $3    }
         | Expr '+' Expr                { Prim "+" $1 $3    }
         | Expr '-' Expr                { Prim "-" $1 $3    }

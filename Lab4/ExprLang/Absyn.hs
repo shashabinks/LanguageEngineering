@@ -7,6 +7,7 @@ import ExprLex
 data Expr = CstI Int 
           | Var  String 
           | Let  String Expr Expr
+          | If   Expr   Expr Expr
           | Prim String Expr Expr
           deriving Show
 

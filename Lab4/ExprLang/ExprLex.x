@@ -16,6 +16,9 @@ tokens :-
     [\+\-\*]                { \s -> operator (head s) }
     [\=\(\)]                { \s -> delimiter (head s) }
     let                     { \s -> TokenLet }
+    if                      { \s -> TokenIf }
+    then                    { \s -> TokenThen }
+    else                    { \s -> TokenElse }
     in                      { \s -> TokenIn }
     end                     { \s -> TokenEnd }
     $alpha [$alphanum]*     { \s -> TokenVar s }
@@ -34,6 +37,9 @@ delimiter c = case c of '(' -> TokenLPar
 
 data Token  = TokenLet 
             | TokenIn 
+            | TokenIf
+            | TokenThen
+            | TokenElse
             | TokenEnd 
             | TokenVar String
             | TokenNum Int
